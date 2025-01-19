@@ -2,7 +2,6 @@ from urllib.parse import urlencode
 import argparse
 import os
 import dotenv
-import subprocess
 import math
 from datetime import datetime
 from pathlib import Path
@@ -24,7 +23,7 @@ def download(
     size_limit: Optional[int] = None,
     audio_index=1,
 ) -> None:
-    audio_bitrate = 128e3
+    audio_bitrate = 128_000
     params = {
         "maxAudioChannels": 2,
         "TranscodingMaxAudioChannels": 2,
@@ -80,7 +79,7 @@ def parse_clip_interval(interval) -> tuple[int, int]:
         duration = timestamp_to_seconds(durationstr)
     elif "-" in interval:
         startstr, endstr = interval.split("-")
-        start = timestamp_to_seconds(start)
+        start = timestamp_to_seconds(startstr)
         end = timestamp_to_seconds(endstr)
         duration = end - start
     else:
@@ -94,9 +93,9 @@ def parse_bitrate(bitrate) -> Union[int, str]:
     if bitrate == "discord":
         return "discord"
     if bitrate[-1] in "kK":
-        return int(bitrate[:-1]) * 1e3
+        return int(bitrate[:-1]) * 1_000
     elif bitrate[-1] == "M":
-        return int(bitrate[:-1]) * 1e6
+        return int(bitrate[:-1]) * 1_000_000
     else:
         return int(bitrate)
 
@@ -121,7 +120,7 @@ if __name__ == "__main__":
         "--bitrate",
         help="The target bitrate of the video in bits per second",
         type=parse_bitrate,
-        default=10e6,
+        default=10_000_000,
     )
     args = parser.parse_args()
     if args.bitrate == "discord":
