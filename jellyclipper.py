@@ -87,8 +87,6 @@ def parse_clip_interval(interval) -> tuple[int, int]:
         raise argparse.ArgumentTypeError(
             "Invalid clip interval. Must be (HH:)MM:SS-(HH:)MM:SS or (HH:)MM:SS+(MM:)SS"
         )
-    if duration < 1 or duration > 120:
-        raise argparse.ArgumentTypeError("Clips must be between 1 and 120 seconds")
     return start, duration
 
 
@@ -127,8 +125,11 @@ if __name__ == "__main__":
     )
     args = parser.parse_args()
     if args.bitrate == "discord":
-        assert args.clip, "Can only use discord bitrate with clip"
+        assert args.clip, "Can only use discord bitrate with clips"
         duration = args.clip[1]
+        assert duration + 1 in range(
+            120
+        ), "Can only use discord bitrate with clips of at most 120 seconds"
         total_bitrate = math.floor(DISCORD_LIMIT / duration * 8 / 1000) * 1000
         size_limit = DISCORD_LIMIT
     else:
