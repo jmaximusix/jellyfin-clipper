@@ -6,34 +6,74 @@ import subprocess
 import math
 from datetime import datetime
 from pathlib import Path
-from typing import Optional, Tuple
+from typing import Optional, Union
 import ffmpeg
 
 dotenv.load_dotenv()
 
 API_KEY = os.getenv("API_KEY")
-print(f"Using API key {API_KEY}")
 BASE_URL = os.getenv("BASE_URL")
-print(f"Using BASE_URL {BASE_URL}")
-DISCORD_LIMIT = 25_000_000
+DISCORD_LIMIT = 25e6
 
 
-def timestamp_to_seconds(timestamp):
-    if timestamp.length == 5:
-        timestamp = "00:" + timestamp
-    datetime_obj = datetime.strptime(timestamp, "%H:%M:%S")
-    seconds = datetime_obj.hour * 3600 + datetime_obj.minute * 60 + datetime_obj.second
-    return seconds
+def download(
+    id: str,
+    output: Path,
+    total_bitrate: int,
+    interval: Optional[tuple[int, int]] = None,
+    size_limit: Optional[int] = None,
+    audio_index=1,
+) -> None:
+    audio_bitrate = 128e3
+    params = {
+        "maxAudioChannels": 2,
+        "TranscodingMaxAudioChannels": 2,
+        "AudioBitrate": audio_bitrate,
+        "VideoBitrate": total_bitrate - audio_bitrate,
+        "VideoCodec": "h265",
+        "AudioCodec": "aac",
+        "AudioStreamIndex": audio_index,
+    }
+    url = f"{BASE_URL}/Videos/{id}/main.m3u8?{urlencode(params)}"
+
+    print(f"Downloading into: {output}")
+    ffmpeg_input_args = {}
+    ffmpeg_output_args = {}
+    if interval:
+        (start, duration) = interval
+        ffmpeg_input_args["ss"] = start
+        ffmpeg_input_args["t"] = duration
+    if size_limit:
+        ffmpeg_output_args["fs"] = size_limit
+    (
+        ffmpeg.input(
+            url,
+            **ffmpeg_input_args,
+            headers=f'Authorization: MediaBrowser Token="{API_KEY}"\r\n',
+        )
+        .output(str(output), c="copy")
+        .run()
+    )
 
 
-def valid_output_path(path):
+def valid_output_path(path) -> Path:
     path = Path(path)
     if not path.parent.exists():
         raise argparse.ArgumentTypeError(f"Invalid path: {path.parent} does not exist")
     return path
 
 
-def parse_clip_interval(interval):
+def timestamp_to_seconds(timestamp) -> int:
+    if len(timestamp) == 2:
+        timestamp = "00:00:" + timestamp
+    if len(timestamp) == 5:
+        timestamp = "00:" + timestamp
+    datetime_obj = datetime.strptime(timestamp, "%H:%M:%S")
+    seconds = datetime_obj.hour * 3600 + datetime_obj.minute * 60 + datetime_obj.second
+    return seconds
+
+
+def parse_clip_interval(interval) -> tuple[int, int]:
     if "+" in interval:
         startstr, durationstr = interval.split("+")
         start = timestamp_to_seconds(startstr)
@@ -52,87 +92,15 @@ def parse_clip_interval(interval):
     return start, duration
 
 
-# def download_clip(id, start, end, output, audio_index=1):
-#     start_seconds = timestamp_to_seconds(start)
-#     end_seconds = timestamp_to_seconds(end)
-#     duration = end_seconds - start_seconds
-#     assert duration > 1 and duration < 120, "Clips must be between 1 and 120 seconds"
-#     total_bitrate = (
-#         math.floor(DISCORD_LIMIT / duration * 8 / 1000) * 1000
-#     )  # round down to nearest 1000
-#     audio_bitrate = 128_000
-#     params = {
-#         "maxAudioChannels": 2,
-#         "TranscodingMaxAudioChannels": 2,
-#         "AudioBitrate": audio_bitrate,
-#         "VideoBitrate": total_bitrate - audio_bitrate,
-#         "VideoCodec": "h265",
-#         "AudioCodec": "aac",
-#         "AudioStreamIndex": audio_index,
-#     }
-#     url = f"{BASE_URL}/Videos/{id}/main.m3u8?{urlencode(params)}"
-#     ffmpeg_args = [
-#         "ffmpeg",
-#         "-ss",
-#         str(start_seconds),
-#         "-t",
-#         str(duration),
-#         "-headers",
-#         f'Authorization: MediaBrowser Token="{API_KEY}"\r\n',
-#         "-i",
-#         url,
-#         "-c",
-#         "copy",
-#         "-fs",
-#         str(DISCORD_LIMIT),
-#         output,
-#     ]
-#     subprocess.run("ffmpeg" + ffmpeg_args)
-
-
-def download(
-    id: str,
-    output: Path,
-    total_bitrate: int,
-    interval: Optional[Tuple[int, int]] = None,
-    size_limit: Optional[int] = None,
-    audio_index=1,
-):
-    audio_bitrate = 128_000
-    params = {
-        "maxAudioChannels": 2,
-        "TranscodingMaxAudioChannels": 2,
-        "AudioBitrate": audio_bitrate,
-        "VideoBitrate": total_bitrate - audio_bitrate,
-        "VideoCodec": "h265",
-        "AudioCodec": "aac",
-        "AudioStreamIndex": audio_index,
-    }
-    url = f"{BASE_URL}/Videos/{id}/main.m3u8?{urlencode(params)}"
-
-    print(f"Downloading into: {output}")
-
-    if interval:
-        (start, duration) = interval
-        (
-            ffmpeg.input(
-                url,
-                ss=start,
-                t=duration,
-                headers=f'Authorization: MediaBrowser Token="{API_KEY}"\r\n',
-            )
-            .output(str(output), c="copy", fs=size_limit)
-            .run()
-        )
+def parse_bitrate(bitrate) -> Union[int, str]:
+    if bitrate == "discord":
+        return "discord"
+    if bitrate[-1] in "kK":
+        return int(bitrate[:-1]) * 1e3
+    elif bitrate[-1] == "M":
+        return int(bitrate[:-1]) * 1e6
     else:
-        (
-            ffmpeg.input(
-                url,
-                headers=f'Authorization: MediaBrowser Token="{API_KEY}"\r\n',
-            )
-            .output(str(output), c="copy")
-            .run()
-        )
+        return int(bitrate)
 
 
 if __name__ == "__main__":
@@ -154,19 +122,17 @@ if __name__ == "__main__":
     parser.add_argument(
         "--bitrate",
         help="The target bitrate of the video in bits per second",
-        type=int,
-        default=None,
+        type=parse_bitrate,
+        default=10e6,
     )
     args = parser.parse_args()
-    if args.clip and not args.bitrate:
+    if args.bitrate == "discord":
+        assert args.clip, "Can only use discord bitrate with clip"
         duration = args.clip[1]
         total_bitrate = math.floor(DISCORD_LIMIT / duration * 8 / 1000) * 1000
         size_limit = DISCORD_LIMIT
-    elif args.bitrate:
-        total_bitrate = args.bitrate
-        size_limit = None
     else:
-        total_bitrate = 10_000_000
+        total_bitrate = args.bitrate
         size_limit = None
     download(
         args.id,
@@ -176,4 +142,3 @@ if __name__ == "__main__":
         size_limit=size_limit,
         audio_index=args.audio_index,
     )
-    # download_clip(args.id, args.start, args.end, args.output, args.audio_index)
