@@ -13,7 +13,7 @@ You can copy `.env.example` as a starting point
 
 `jellyclipper.py [-h] [--clip CLIP] [--audio-index AUDIO_INDEX] [--bitrate BITRATE] id output`
 
-`--help / -h` provides a short description of the arguments
+`--help / -h` provides a short description of the arguments\
 `output`: Path to output file. Select container by extension (e.g. mp4, mkv, probably best to stick with those)
 
 #### Finding the 'id'
