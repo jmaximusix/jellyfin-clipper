@@ -11,7 +11,7 @@ You can copy `.env.example` as a starting point
 
 ## Usage
 
-`jellyclipper.py [-h] [--clip CLIP] [--audio-index AUDIO_INDEX] [--bitrate BITRATE] id output`
+`jellyclipper.py [-h] [--clip CLIP] [--audio-index AUDIO_INDEX] [--bitrate BITRATE] [--codec {h264,h265}] id output`
 
 `--help / -h` provides a short description of the arguments\
 `output`: Path to output file. Select container by extension (e.g. mp4, mkv, probably best to stick with those)
@@ -38,3 +38,6 @@ Assuming there's no way to configure this behaviour in jellyfin (haven't found a
 
 #### Audio-Index
 This can be used to select the desired audio track if multiple are present. Useful for multilanguage content. By default this is set to 1 (which means using the default one).
+
+#### Codec
+Select between h264 and h265 codecs. By default h265 is used because of better image quality at the same bitrate.

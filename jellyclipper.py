@@ -19,6 +19,7 @@ def download(
     id: str,
     output: Path,
     total_bitrate: int,
+    codec: str = "h265",
     interval: Optional[tuple[int, int]] = None,
     size_limit: Optional[int] = None,
     audio_index=1,
@@ -29,7 +30,7 @@ def download(
         "TranscodingMaxAudioChannels": 2,
         "AudioBitrate": audio_bitrate,
         "VideoBitrate": total_bitrate - audio_bitrate,
-        "VideoCodec": "h265",
+        "VideoCodec": codec,
         "AudioCodec": "aac",
         "AudioStreamIndex": audio_index,
     }
@@ -122,6 +123,12 @@ if __name__ == "__main__":
         type=parse_bitrate,
         default=10_000_000,
     )
+    parser.add_argument(
+        "--codec",
+        help="The codec to use for the video",
+        choices=["h264", "h265"],
+        default="h265",
+    )
     args = parser.parse_args()
     if args.bitrate == "discord":
         assert args.clip, "Can only use discord bitrate with clips"
@@ -138,6 +145,7 @@ if __name__ == "__main__":
         args.id,
         args.output,
         total_bitrate,
+        codec=args.codec,
         interval=args.clip,
         size_limit=size_limit,
         audio_index=args.audio_index,
