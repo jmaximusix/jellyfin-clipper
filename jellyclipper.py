@@ -12,7 +12,7 @@ dotenv.load_dotenv()
 
 API_KEY = os.getenv("API_KEY")
 BASE_URL = os.getenv("BASE_URL")
-DISCORD_LIMIT = 25e6
+DISCORD_LIMIT = 10e6
 
 
 def download(
